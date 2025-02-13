@@ -1,185 +1,324 @@
-import React, { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../../store';
+import type React from "react"
+import { useEffect, useState } from "react"
+import { useSelector, useDispatch } from "react-redux"
+import type { RootState, AppDispatch } from "../../store"
 import {
   updateTask,
   toggleTaskSelection,
   batchUpdateTasks,
   batchDeleteTasks,
   sortTasksByDueDate,
-  deleteTask, 
-} from '../../store/slices/tasksSlice';
-import BoardView from './BoardView';
-import { TaskForm } from '../createtask/TaskForm';
-import { Task } from '../../types';
-import TaskHistory from './TaskHistory';
-import FilterSection, { TaskFilters } from '../header/FilterSection';
+  deleteTask,
+  fetchTasks,
+  applyFilters,
+} from "../../store/slices/tasksSlice"
+import BoardView from "./BoardView"
+import { TaskForm } from "../createtask/TaskForm"
+import type { Task } from "../../types"
+import TaskHistory from "./TaskHistory"
+import FilterSection, { type TaskFilters } from "../header/FilterSection"
+import noresult from "../../assets/noresult.webp"
+import { DragDropContext, DropResult } from '@hello-pangea/dnd'
 
-const TaskBoard: React.FC = () => {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
+interface TaskBoardProps {
+  hasSearched: boolean;
+  setHasSearched: (value: boolean) => void;
+}
 
-  const dispatch = useDispatch();
-  const tasks = useSelector((state: RootState) => state.tasks.tasks);
-  const selectedTasks = useSelector((state: RootState) => state.tasks.selectedTasks);
-  const sortOrder = useSelector((state: RootState) => state.tasks.sortOrder);
+const TaskBoard: React.FC<TaskBoardProps> = ({ hasSearched, setHasSearched }) => {
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [showBatchConfirm, setShowBatchConfirm] = useState(false)
+  const [batchAction, setBatchAction] = useState<"complete" | "delete" | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const dispatch = useDispatch<AppDispatch>()
+  const tasks = useSelector((state: RootState) => state.tasks.tasks)
+  const filteredTasks = useSelector((state: RootState) => state.tasks.filteredTasks)
+  const selectedTasks = useSelector((state: RootState) => state.tasks.selectedTasks)
+  const batchStatus = useSelector((state: RootState) => state.tasks.batchStatus)
+  const status = useSelector((state: RootState) => state.tasks.status)
 
   const [filters, setFilters] = useState<TaskFilters>({
     sortOrder: "asc",
     title: "",
     category: "",
     dueDate: null,
-  });
-
+  })
 
   useEffect(() => {
-    // Sort tasks when sortOrder changes
-    dispatch(sortTasksByDueDate(filters.sortOrder));
-  }, [filters.sortOrder, dispatch]);
+    dispatch(sortTasksByDueDate(filters.sortOrder))
+  }, [filters.sortOrder, dispatch])
+
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        setIsLoading(true)
+        await dispatch(fetchTasks()).unwrap()
+      } catch (error) {
+        console.error("Failed to fetch tasks:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadTasks()
+  }, [dispatch])
+
+  useEffect(() => {
+    dispatch(applyFilters(filters))
+  }, [dispatch, tasks])
 
   const handleAddTask = () => {
-    setEditingTask(null);
-    setIsFormOpen(true);
-  };
+    setEditingTask(null)
+    setIsFormOpen(true)
+  }
 
   const handleEditTask = (task: Task) => {
-    setEditingTask(task);
-    setIsFormOpen(true);
-  };
+    setEditingTask(task)
+    setIsFormOpen(true)
+  }
 
   const handleFormClose = () => {
-    setIsFormOpen(false);
-    setEditingTask(null);
-  };
-
-  const handleTaskDrop = (updatedTask: Task) => {
-    dispatch(updateTask(updatedTask));
-  };
-
-  const handleFormSubmitSuccess = () => {
-    setIsFormOpen(false);
-    setEditingTask(null);
-  };
+    setIsFormOpen(false)
+    setEditingTask(null)
+  }
 
   const handleTaskSelect = (taskId: string) => {
-    dispatch(toggleTaskSelection(taskId));
-  };
+    dispatch(toggleTaskSelection(taskId))
+  }
 
-  const handleBatchComplete = () => {
-    dispatch(batchUpdateTasks({
-      ids: selectedTasks,
-      updates: { status: 'completed' }
-    }));
-  };
+  const handleBatchConfirm = async () => {
+    if (batchStatus === "processing") return
 
-  const handleBatchDelete = () => {
-    dispatch(batchDeleteTasks(selectedTasks));
-  };
+    try {
+      if (batchAction === "complete") {
+        await dispatch(
+          batchUpdateTasks({
+            ids: selectedTasks,
+            updates: { 
+              status: "completed",
+              completedAt: new Date().toISOString(),
+            },
+          })
+        ).unwrap()
+      } else if (batchAction === "delete") {
+        await dispatch(batchDeleteTasks(selectedTasks)).unwrap()
+      }
+      setShowBatchConfirm(false)
+      setBatchAction(null)
+    } catch (error) {
+      console.error("Failed to perform batch action:", error)
+    }
+  }
 
   const handleSort = () => {
-    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-    dispatch(sortTasksByDueDate(newOrder));
-  };
+    const newOrder = filters.sortOrder === "asc" ? "desc" : "asc"
+    setFilters((prev) => ({ ...prev, sortOrder: newOrder }))
+  }
 
-  const handleDeleteTask = (taskId: string) => {
-    dispatch(deleteTask(taskId)); // Dispatch delete action for a single task
-  };
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await dispatch(deleteTask(taskId)).unwrap()
+    } catch (error) {
+      console.error("Failed to delete task:", error)
+    }
+  }
+
   const handleFilterChange = (newFilters: TaskFilters) => {
-    setFilters(newFilters);
+    setFilters(newFilters)
+    dispatch(applyFilters(newFilters))
+    setHasSearched(true)
+  }
+
+  const handleBatchActionClick = (action: "complete" | "delete") => {
+    setBatchAction(action)
+    setShowBatchConfirm(true)
+  }
+
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+
+    const { draggableId, destination } = result;
+    const task = tasks.find(t => t.id === draggableId);
+
+    if (task && task.status !== destination.droppableId) {
+      try {
+        const updatedTask = {
+          ...task,
+          status: destination.droppableId as Task['status'],
+          updatedAt: new Date().toISOString(),
+          completedAt: destination.droppableId === 'completed' ? new Date().toISOString() : null
+        };
+        
+        await dispatch(updateTask(updatedTask)).unwrap();
+      } catch (error) {
+        console.error('Failed to update task:', error);
+      }
+    }
   };
 
   const columns = [
-    { title: 'To Do', status: 'todo', placeholderText: 'No tasks to do', bgColor: 'bg-[#fac2ff]' },
-    { title: 'In Progress', status: 'in-progress', placeholderText: 'No tasks in progress', bgColor: 'bg-[#85d9f1]' },
-    { title: 'Done', status: 'completed', placeholderText: 'No completed tasks', bgColor: 'bg-[#cfffcd]' }
-  ];
- 
+    { title: "To Do", status: "todo", placeholderText: "No tasks to do", bgColor: "bg-[#fac2ff]" },
+    { title: "In Progress", status: "in-progress", placeholderText: "No tasks in progress", bgColor: "bg-[#85d9f1]" },
+    { title: "Done", status: "completed", placeholderText: "No completed tasks", bgColor: "bg-[#cfffcd]" },
+  ]
+
   return (
-    <div className="p-6">
-       <FilterSection
-        filters={filters}
-        tasks={tasks}
-        onFilterChange={handleFilterChange}
-      />
-      <div className="flex justify-between items-center mb-6 m-3">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleSort}
-            className="font-semibold cursor-pointer flex items-center gap-1 px-3 py-2 border border-solid border-black border-opacity-20 rounded-full min-h-[26px] w-[150px] text-sm"
-            aria-label={`Sort tasks by due date in ${sortOrder === 'asc' ? 'ascending' : 'descending'} order`}
-          >
-            <span>Due Date</span>
-            {sortOrder && (
-              <svg
-                className={`w-4 h-4 transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-              </svg>
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div className="h-screen p-4 flex flex-col">
+        {/* Top Section with Search and Action Buttons */}
+        <div className="flex flex-col gap-4 mb-6">
+          {/* FilterSection */}
+          <FilterSection 
+            filters={filters} 
+            tasks={tasks} 
+            onFilterChange={handleFilterChange}
+            setHasSearched={setHasSearched}
+          />
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleSort}
+              className="font-semibold cursor-pointer flex items-center gap-2 px-4 py-2 
+                       border border-solid border-black border-opacity-20 rounded-full min-h-[36px] text-sm"
+            >
+              Due Date {filters.sortOrder === "asc" ? "↑" : "↓"}
+            </button>
+
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="font-semibold cursor-pointer flex items-center gap-2 px-4 py-2 
+                       border border-solid border-black border-opacity-20 rounded-full min-h-[36px] text-sm"
+            >
+              {showHistory ? "Hide Activity" : "Show Activity"}
+            </button>
+
+            {selectedTasks.length > 0 && (
+              <div className="flex items-center gap-4 ml-auto">
+                <button
+                  onClick={() => handleBatchActionClick("complete")}
+                  className="cursor-pointer px-4 py-2 text-sm bg-green-500 text-white rounded-full
+                           hover:bg-green-600 transition-colors duration-200 font-medium"
+                >
+                  Complete Selected ({selectedTasks.length})
+                </button>
+                <button
+                  onClick={() => handleBatchActionClick("delete")}
+                  className="cursor-pointer px-4 py-2 text-sm bg-red-500 text-white rounded-full
+                           hover:bg-red-600 transition-colors duration-200 font-medium"
+                >
+                  Delete Selected ({selectedTasks.length})
+                </button>
+              </div>
             )}
-          </button>
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="font-semibold cursor-pointer flex items-center gap-1 px-3 py-2 border border-solid border-black border-opacity-20 rounded-full min-h-[26px] w-[150px] text-sm"
-            aria-label={showHistory ? 'Hide task history' : 'Show task history'}
-          >
-            {showHistory ? 'Hide Activity' : 'Show Activity'}
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          {selectedTasks.length > 0 && (
-            <>
-              <button
-                onClick={handleBatchComplete}
-                className="cursor-pointer px-3 py-1 text-sm bg-green-500 text-black rounded hover:bg-green-600"
-              >
-                Complete Selected
-              </button>
-              <button
-                onClick={handleBatchDelete}
-                className="px-3 py-1 text-sm bg-red-500 text-black rounded hover:bg-red-600"
-              >
-                Delete Selected
-              </button>
-            </>
-          )}
-        
-        </div>
-      </div>
-      {showHistory && <TaskHistory />}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {columns.map(({ title, status, placeholderText }) => (
-          <div key={status} className="p-4 rounded-lg">
-            <BoardView
-              title={title}
-              status={status}
-              tasks={tasks}
-              placeholderText={placeholderText}
-              onAddTask={handleAddTask}
-              onDrop={handleTaskDrop}
-              onEditTask={handleEditTask}
-              onDeleteTask={handleDeleteTask} // Pass delete function to BoardView
-              selectedTasks={selectedTasks}
-              onTaskSelect={handleTaskSelect}
-            />
           </div>
-        ))}
+        </div>
+
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[...Array(3)].map((_, index) => (
+              <div key={index} className="animate-pulse">
+                <div className="h-16 bg-gray-200 rounded-t-lg mb-4"></div>
+                <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-24 bg-gray-100 rounded-lg"></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : status === "failed" ? (
+          <div className="p-4 text-center text-red-500">Failed to load tasks</div>
+        ) : filteredTasks.length === 0 && hasSearched && tasks.length > 0 ? (
+          <div className="flex flex-col items-center justify-center mt-8">
+            <img src={noresult} alt="No Results" className="w-64 h-64 mb-4" />
+            <p className="text-gray-600">No matching tasks found</p>
+          </div>
+        ) : (
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
+            {columns.map(({ title, status, placeholderText, bgColor }) => (
+              <BoardView
+                key={status}
+                title={title}
+                status={status}
+                tasks={filteredTasks.filter(task => task.status === status)}
+                placeholderText={placeholderText}
+                onAddTask={handleAddTask}
+                onEditTask={handleEditTask}
+                onDeleteTask={handleDeleteTask}
+                selectedTasks={selectedTasks}
+                onTaskSelect={handleTaskSelect}
+                statusColors={bgColor}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Task History Modal */}
+        {showHistory && (
+          <TaskHistory
+            className="w-full max-w-2xl mx-auto mb-6" 
+            onClose={() => setShowHistory(false)}
+          />
+        )}
+
+        {/* Modals */}
+        {isFormOpen && (
+          <TaskForm
+            onCancel={handleFormClose}
+            editingTask={editingTask}
+            onSubmitSuccess={handleFormClose}
+            className="w-full max-w-lg mx-auto"
+          />
+        )}
+
+        {showBatchConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
+              <h3 className="text-lg font-semibold mb-4">Confirm Batch Action</h3>
+              <p className="text-gray-600 mb-6">
+                {batchAction === "complete"
+                  ? `Are you sure you want to mark ${selectedTasks.length} tasks as complete?`
+                  : `Are you sure you want to delete ${selectedTasks.length} tasks? This action cannot be undone.`}
+              </p>
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={() => {
+                    setShowBatchConfirm(false)
+                    setBatchAction(null)
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBatchConfirm}
+                  disabled={batchStatus === "processing"}
+                  className={`px-4 py-2 text-white rounded-lg transition-colors duration-200
+                            ${
+                              batchAction === "complete"
+                                ? "bg-green-500 hover:bg-green-600"
+                                : "bg-red-500 hover:bg-red-600"
+                            }
+                            disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {batchStatus === "processing" 
+                    ? "Processing..." 
+                    : batchAction === "complete" 
+                      ? "Complete" 
+                      : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-      {showHistory && <TaskHistory />}
-
-      {isFormOpen && (
-        <TaskForm
-          onCancel={handleFormClose}
-          editingTask={editingTask}
-          onSubmitSuccess={handleFormSubmitSuccess} className={''}        />
-      )}
-    </div>
-  );
-};
+    </DragDropContext>
+  )
+}
 
 export default TaskBoard;

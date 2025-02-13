@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-
+import { getFirestore } from "firebase/firestore"
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwKSW2HzGrGigVlbkpsrHQ5aWKYzRKECs",
@@ -30,3 +30,5 @@ export const logOut = async () => {
 };
 
 export { auth };
+
+export const db = getFirestore(app)

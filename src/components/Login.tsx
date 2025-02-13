@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, signInWithGoogle } from "../firebase/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
-import taskbuddy from "../assets/taskbuddy logo.png";
-import google from "../assets/google.png";
-import rightside from "../assets/rightside.png"; // Import the rightside image
+import taskbuddy from "../assets/taskbuddy logo.webp";
+import google from "../assets/google.webp";
+import rightside from "../assets/rightside.webp"; 
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import circle from '../assets/circle.png'
+import circle from '../assets/circle.webp'
 
 const Login = () => {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ const Login = () => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         toast.success("Login successful! Redirecting...");
-        navigate("/listview");
+        navigate("/dashboard");
       }
     });
     return () => unsubscribe();

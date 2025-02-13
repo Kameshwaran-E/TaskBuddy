@@ -1,16 +1,14 @@
 import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
-import kamesh from '../../assets/kamesh.png'
+import defaultAvatar from '../../assets/kamesh.webp'; 
 
 function UserProfile() {
   const [user, setUser] = useState<User | null>(null);
-  const [initial, setInitial] = useState<string | null>(null);
-  
+
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      setInitial(currentUser?.displayName ? currentUser.displayName.charAt(0).toUpperCase() : null);
     });
 
     return () => unsubscribe(); // Cleanup listener on unmount
@@ -24,8 +22,10 @@ function UserProfile() {
     ? user.displayName.charAt(0).toUpperCase() + user.displayName.slice(1)
     : "User";
 
+  
+
   return (
-    <div className="flex flex-wrap gap-5 justify-between w-full max-md:bg-[#faeefc] whitespace-nowrap max-md:max-w-full ">
+    <div className="flex flex-wrap gap-5 justify-between w-full max-md:bg-[#faeefc] whitespace-nowrap max-md:max-w-full">
       {/* Logo & App Name */}
       <div className="flex gap-1.5 self-start text-2xl font-semibold text-zinc-800">
         <img
@@ -38,14 +38,24 @@ function UserProfile() {
       </div>
 
       {/* User Info */}
-      <div className="flex gap-2 text-base font-bold text-black text-opacity-60">
-        <img
-          loading="lazy"
-          src={kamesh} alt="User Avatar"
-          className="object-contain shrink-0 w-9 rounded-full aspect-square"
-        />
+      <div className="flex gap-2 text-base font-bold text-black text-opacity-60 items-center">
+        {user.photoURL ? (
+          <img
+            loading="lazy"
+            src={defaultAvatar}
+            alt="User Avatar"
+            className="object-cover shrink-0 w-9 h-9 rounded-full"
+          />
+        ) : (
+          <div className="flex items-center justify-center w-9 h-9 bg-gray-300 text-white text-lg font-semibold rounded-full">
+            {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+          </div>
+        )}
         <div className="my-auto max-md:hidden">{capitalizedName}</div>
       </div>
+
+      {/* Logout Button */}
+      
     </div>
   );
 }

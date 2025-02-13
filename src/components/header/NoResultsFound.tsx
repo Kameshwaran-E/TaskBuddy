@@ -3,7 +3,7 @@ import noresult from '../../assets/noresult.png';
 
 const NoResultsFound = () => {
   return (
-    <div className="flex justify-center items-center w-full mt-6 h-[200px]">
+    <div className="flex justify-center items-center w-full mt-6 h-[400px]">
       <img
         src={noresult}
         alt="No Results Found"

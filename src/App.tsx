@@ -4,7 +4,7 @@ import { Provider } from 'react-redux';
 import { store } from './store';
 import Login from './components/Login';
 import { ToastContainer } from "react-toastify";
-import ViewSection from './components/view/ViewSection';
+import DashBoard from './components/view/DashBoard';
 
 const App: React.FC = () => {
   return (
@@ -14,7 +14,7 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-gray-50">
           <Routes>
             <Route path="/" element={<Login />} />
-            <Route path="/listview" element={<ViewSection />} />
+            <Route path="/dashboard" element={<DashBoard />} />
           </Routes>
         </div>
       </Router>

@@ -1,5 +1,6 @@
 export interface Task {
   id: string;
+  userId: string | undefined;
   title: string;
   description: string;
   category: string;
@@ -13,8 +14,7 @@ export interface Task {
   onClick?: () => void;
   type?: 'button' | 'submit' | 'reset';
   attachments: { fileName: string; fileUrl: string }[];
-  
-
+  completedAt?: string | null
 }
 export interface InputFieldProps {
   label: string;
@@ -37,19 +37,18 @@ export interface TaskFormData {
 }
 
 export interface TaskHistory {
-  id: string;
-  taskId: string;
-  action: 'created' | 'updated' | 'deleted';
-  changes: {
-    field: string;
-    oldValue?: any;
-    newValue?: any;
-  }[];
-  timestamp: string;
-  type?: 'button' | 'submit' | 'reset';
+  id: string
+  taskId: string
+  action: "created" | "updated" | "deleted"
+  changes: TaskHistoryChange[]
+  timestamp: string
 }
 
-
+export interface TaskHistoryChange {
+  field: keyof Task | "all"
+  oldValue?: any
+  newValue: any
+}
 
 
 
